@@ -2380,7 +2380,9 @@ ROCM_INDEXES = {"gfx1100": "https://rocm.nightlies.amd.com/v2/gfx110X-dgpu/",   
                 "gfx1201": "https://rocm.nightlies.amd.com/v2/gfx120X-all/",
                 "gfx1030": "https://rocm.nightlies.amd.com/v2/gfx103X-all/",
                 "gfx1031": "https://rocm.nightlies.amd.com/v2/gfx103X-all/",
-                "gfx1151": "https://rocm.nightlies.amd.com/v2/gfx1151/",       # Strix Halo (docs/STRIX_HALO.md)
+                "gfx1151": "https://rocm.nightlies.amd.com/v2/gfx1151/",
+                "gfx1150": "https://rocm.nightlies.amd.com/v2/gfx1150/",
+                       # Strix Halo (docs/STRIX_HALO.md)
                 "gfx1103": "https://rocm.nightlies.amd.com/v2/gfx110X-all/"}   # Radeon 780M: only with STRATA_EXPERIMENTAL_GFX1103=1
 # The TheRock nightly indexes are pruned and move on, and each GPU family's index holds its own range (#1103: gfx103X-all
 # starts at 7.13.0a20260422 and has no 7.10; #1267: the 7.10 wheel segfaults on a Strix Halo with kernel 7.2.8), so one
@@ -2397,7 +2399,7 @@ ROCM_SYSTEM_MIN = (7, 0)       # an older system ROCm is passed over for the whe
 # STRATA_EXPERIMENTAL_GFX1103=1 (opt-in, unsupported): the Radeon 780M / 760M / 740M iGPU (Ryzen 7040 / 8040, gfx1103) is taken
 # as a unified-memory AMD card like Strix Halo, with the portable kernels (no WMMA) (measured on one machine: Ryzen 7 255).  Unset: unchanged.
 GFX1103_OPT_IN = os.environ.get("STRATA_EXPERIMENTAL_GFX1103") == "1"
-AMD_ARCHS = ("gfx1100", "gfx1101", "gfx1102", "gfx1200", "gfx1201", "gfx1030", "gfx1031", "gfx1151") + (("gfx1103",) if GFX1103_OPT_IN else ())
+AMD_ARCHS = ("gfx1100", "gfx1101", "gfx1102", "gfx1200", "gfx1201", "gfx1030", "gfx1031", "gfx1151","gfx1150") + (("gfx1103",) if GFX1103_OPT_IN else ())
 AMD_NAMES = {"gfx1100": "AMD Radeon RX 7900 series (gfx1100)",   # when sysfs has no product name
              "gfx1101": "AMD Radeon RX 7800 XT / 7700 XT (gfx1101)",
              "gfx1102": "AMD Radeon RX 7600 / 7600 XT (gfx1102)",
@@ -2413,7 +2415,8 @@ AMD_NAMES = {"gfx1100": "AMD Radeon RX 7900 series (gfx1100)",   # when sysfs ha
 AMD_CARDS = ("the RX 7900 XT / XTX (gfx1100), RX 7800 XT / 7700 XT (gfx1101), RX 9060 XT (gfx1200) and "
              "RX 9070 / 9070 XT / Radeon AI PRO R9700 (gfx1201), and the RX 6800 / 6900 series (gfx1030) and RX 6700 XT "
              "(gfx1031, #524), and the RX 7600 / 7600 XT (gfx1102, one run reported, #942), all unvalidated, and the Ryzen AI Max \"Strix Halo\" APU (Radeon 8060S / 8050S / 8040S, "
-             "gfx1151: experimental, docs/STRIX_HALO.md)")
+             "gfx1151: experimental, docs/STRIX_HALO.md), and the Ryzen AI 300 \"Strix Point\" APU (Radeon 890M / 880M, "
+             "gfx1150: experimental, docs/STRIX_POINT.md)")
 
 
 def rocm_index(arch):
@@ -2488,6 +2491,8 @@ AMD_IGPU_PCI = {0x1586: "gfx1151",                                    # Strix Ha
                 0x1114: "gfx1152", 0x1902: "gfx1152",                 # Krackan Point (Krackan2): Radeon 840M / 860M
                 0x15BF: "gfx1103", 0x15C8: "gfx1103", 0x164F: "gfx1103",   # Phoenix: Radeon 740M / 760M / 780M
                 0x1900: "gfx1103", 0x1901: "gfx1103"}                 # Hawk Point
+UMA_ARCHS = ("gfx1151", "gfx1150")      # the integrated GPUs setup treats as unified memory: Strix Halo, Strix Point
+UMA_PCI_IDS = STRIX_HALO_PCI_IDS | frozenset({0x150E})
 STRIX_HALO_BY_SIMDS = {80: "8060S", 64: "8050S", 32: "8040S"}   # KFD simd_count (2 per CU): 40 / 32 / 16 CUs
 UMA_OS_LEFT_GB = 6             # the share of the unified memory kept for the OS: what the engine's device_free_bytes() leaves
 
@@ -2503,8 +2508,14 @@ def is_strix_halo(g) -> bool:
     return isinstance(g, dict) and gfx_arch_is(g.get("arch"), STRIX_HALO_ARCH)
 
 
+def is_uma_apu(g) -> bool:
+    """An integrated Radeon whose memory setup treats as unified: Strix Halo (gfx1151) or Strix Point (gfx1150).
+    Exact arch match like is_strix_halo: gfx1152 and gfx1103 are other chips and stay unsupported."""
+    return isinstance(g, dict) and any(gfx_arch_is(g.get("arch"), a) for a in UMA_ARCHS)
+
+
 def amd_apply_uma(g: dict, gtt_gb: float = 0.0, ram: float | None = None) -> dict:
-    """Strix Halo is an APU with unified memory.  Its "dedicated VRAM" is a BIOS carve-out (512 MB to 96 GB; 2 GB on the
+    """Strix Halo and Strix Point are APUs with unified memory.  Its "dedicated VRAM" is a BIOS carve-out (512 MB to 96 GB; 2 GB on the
     maintainers' box) and the GPU also reaches shared system memory (Linux: the GTT pool, `mem_info_gtt_total`, half the
     RAM unless the kernel was told otherwise; Windows: "shared GPU memory", half the RAM).  The shared part IS the RAM
     the model's experts live in, so it is not extra room beside the RAM.  g gets: uma, dedicated_gb (the carve-out: the
@@ -2669,12 +2680,20 @@ def igpu_notes(gpu, ram) -> list[str]:
 def strix_halo_notes(gpu, ram) -> list[str]:
     """What setup tells a Strix Halo owner (a leading "!" = a warning): the unified memory, the build, the guide, and the
     memory settings that give the GPU room.  Nothing is changed or refused: recommend, never force."""
-    notes = [f"  Strix Halo (gfx1151, Ryzen AI Max): the CPU and the GPU share one memory pool ({ram:.0f} GB seen by the "
+    point = gfx_arch_is(gpu.get("arch"), "gfx1150")
+    chip, doc = (("Strix Point (gfx1150, Ryzen AI 300: Radeon 890M / 880M)", "docs/STRIX_POINT.md") if point
+                 else ("Strix Halo (gfx1151, Ryzen AI Max)", "docs/STRIX_HALO.md"))
+    notes = [f"  {chip}: the CPU and the GPU share one memory pool ({ram:.0f} GB seen by the "
              f"OS + a {gpu.get('dedicated_gb', 0.0):.1f} GB BIOS carve-out), so the model's experts live in that pool "
              "and the expert cache is sized from the memory the OS can give back, not from the carve-out."]
-    notes.append("  " + ("The engine is compiled here for gfx1151" if not WIN else "Windows uses the ready-made AMD engine, "
-                                                                                     "which must be built for gfx1151")
-                 + " (experimental, measured on one machine): see docs/STRIX_HALO.md.")
+    arch = "gfx1150" if point else "gfx1151"
+    notes.append("  " + (f"The engine is compiled here for {arch}" if not WIN else "Windows uses the ready-made AMD engine, "
+                                                                                     f"which must be built for {arch}")
+                 + (" (experimental, NOT measured by the maintainers on this chip)" if point
+                    else " (experimental, measured on one machine)") + f": see {doc}.")
+    if point:
+        notes.append("!the 890M is a 16-CU iGPU that shares the system memory's bandwidth with the CPU: expect much slower "
+                     "answers than the discrete cards in the README")
     if not WIN and gpu.get("shared_gb", 0) < 0.75 * ram - 1:
         notes.append(f"!the GPU can reach {gpu.get('shared_gb', 0):.0f} GB of shared memory (the GTT pool; the kernel's "
                      f"default is about half of the RAM). docs/STRIX_HALO.md boots with ttm.pages_limit and "
@@ -2776,7 +2795,7 @@ def amd_gpus(sysfs="/sys"):
 def amd_problem(g):
     if g["arch"] not in AMD_ARCHS:
         return (f"not supported - PolyStrata's AMD backend runs on {AMD_CARDS} only, this is {g['arch']}"
-                + (" (an integrated Radeon, not Strix Halo)" if g["arch"] in ("gfx1150", "gfx1152", "gfx1103") else ""))
+                + (" (an integrated Radeon, not Strix Halo or Strix Point)" if g["arch"] in ("gfx1152", "gfx1103") else ""))
     if g.get("cannot_run"):                            # Windows: the installed engine's own check (--list-devices)
         return g["cannot_run"]
     return None
@@ -2788,9 +2807,9 @@ def amd_gpus_win() -> list[dict]:
     hip = hip_devices()
     if not hip:
         return amd_gpus_windows()
-    halo = [g for g in hip if is_strix_halo(g)]
+    halo = [g for g in hip if is_uma_apu(g)]
     if halo:                                           # an APU: the HIP runtime's figure is not the BIOS carve-out
-        reg = [r for r in amd_gpus_windows() if is_strix_halo(r)]
+        reg = [r for r in amd_gpus_windows() if is_uma_apu(r)]
         for k, g in enumerate(halo):
             reported = g["vram_gb"]
             g["vram_gb"] = reg[k]["dedicated_gb"] if k < len(reg) else 0.0
