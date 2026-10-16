@@ -3,8 +3,11 @@
 #include "strata/platform/aux_cpus.hpp"
 
 #include <algorithm>
+#include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <condition_variable>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <deque>
@@ -201,6 +204,7 @@ void DirectFile::close() {
 }
 
 bool DirectFile::is_open() const { return impl_->file != INVALID_HANDLE_VALUE; }
+bool DirectFile::is_direct() const { return impl_->file != INVALID_HANDLE_VALUE; }
 uint64_t DirectFile::size() const { return impl_->size; }
 
 bool DirectFile::submit(uint64_t offset, void* buffer, uint32_t length, uint64_t tag, std::string& err) {
@@ -266,6 +270,7 @@ void DirectFile::wake() {
 // rows one at a time.
 struct DirectFile::Impl {
     int fd = -1;
+    bool direct = false;   // O_DIRECT in effect (false: opened through the file cache)
     uint64_t size = 0;
     std::mutex mu;
     std::condition_variable cv_work, cv_done;
@@ -306,13 +311,37 @@ DirectFile::~DirectFile() { close(); delete impl_; }
 
 bool DirectFile::open(const std::string& path, std::string& err) {
     close();
+    impl_->direct = false;
+    int open_errno = 0;
 #if defined(__APPLE__)   // macOS has no O_DIRECT: F_NOCACHE keeps the reads out of the unified buffer cache
     impl_->fd = ::open(path.c_str(), O_RDONLY);
     if (impl_->fd >= 0 && fcntl(impl_->fd, F_NOCACHE, 1) != 0) { ::close(impl_->fd); impl_->fd = -1; }
+    open_errno = errno;
+    impl_->direct = impl_->fd >= 0;
 #else
-    impl_->fd = ::open(path.c_str(), O_RDONLY | O_DIRECT);
+    // STRATA_NO_ODIRECT=1 skips O_DIRECT. Without it, a filesystem that refuses O_DIRECT at open (eCryptFS, some FUSE
+    // mounts, tmpfs before Linux 6.6: EINVAL) is read through the file cache instead of failing the load.
+    const char* no_direct = std::getenv("STRATA_NO_ODIRECT");
+    const bool skip_direct = no_direct != nullptr && no_direct[0] != '\0' && no_direct[0] != '0';
+    if (!skip_direct) {
+        impl_->fd = ::open(path.c_str(), O_RDONLY | O_DIRECT);
+        open_errno = errno;
+        impl_->direct = impl_->fd >= 0;
+    }
+    if (impl_->fd < 0 && (skip_direct || open_errno == EINVAL || open_errno == ENOTSUP || open_errno == EOPNOTSUPP)) {
+        impl_->fd = ::open(path.c_str(), O_RDONLY);
+        open_errno = errno;
+        if (impl_->fd >= 0) {
+            (void) posix_fadvise(impl_->fd, 0, 0, POSIX_FADV_RANDOM);   // random 4 KiB rows: no read-ahead
+            static std::atomic<bool> noted{false};
+            if (!noted.exchange(true))
+                std::fprintf(stderr, "DirectFile: %s: %s, reading through the file cache (the pages may stay in RAM; "
+                                     "eCryptFS and some FUSE mounts need this)\n", path.c_str(),
+                             skip_direct ? "STRATA_NO_ODIRECT is set" : "the filesystem refuses O_DIRECT");
+        }
+    }
 #endif
-    if (impl_->fd < 0) { err = "DirectFile: cannot open " + path; return false; }
+    if (impl_->fd < 0) { err = "DirectFile: cannot open " + path + " (" + std::strerror(open_errno) + ")"; return false; }
     struct stat st;
     if (fstat(impl_->fd, &st) != 0) { err = "DirectFile: cannot size " + path; close(); return false; }
     impl_->size = (uint64_t) st.st_size;
@@ -325,12 +354,14 @@ void DirectFile::close() {
     impl_->stop_pool();
     if (impl_->fd >= 0) ::close(impl_->fd);
     impl_->fd = -1;
+    impl_->direct = false;
     impl_->size = 0;
     impl_->done.clear();
     impl_->queue.clear();
 }
 
 bool DirectFile::is_open() const { return impl_->fd >= 0; }
+bool DirectFile::is_direct() const { return impl_->fd >= 0 && impl_->direct; }
 uint64_t DirectFile::size() const { return impl_->size; }
 
 bool DirectFile::submit(uint64_t offset, void* buffer, uint32_t length, uint64_t tag, std::string& err) {

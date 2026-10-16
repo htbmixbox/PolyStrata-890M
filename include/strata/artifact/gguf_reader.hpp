@@ -20,6 +20,7 @@
 //
 // Build: scripts/build_artifact.bat        Run: gguf_reader.exe <file.gguf> [--check]
 
+#include <cerrno>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -415,13 +416,13 @@ private:
         file_ = h;
 #else
         int fd = ::open(path_.c_str(), O_RDONLY);
-        if (fd < 0) throw std::runtime_error("cannot open " + path_);
+        if (fd < 0) throw std::runtime_error("cannot open " + path_ + " (" + std::strerror(errno) + ")");
         fd_ = fd;
         struct stat st{};
-        if (fstat(fd, &st) != 0) throw std::runtime_error("fstat failed");
+        if (fstat(fd, &st) != 0) throw std::runtime_error("fstat failed on " + path_ + " (" + std::strerror(errno) + ")");
         size_ = (uint64_t)st.st_size;
         void* p = mmap(nullptr, size_, PROT_READ, MAP_PRIVATE, fd, 0);
-        if (p == MAP_FAILED) throw std::runtime_error("mmap failed");
+        if (p == MAP_FAILED) throw std::runtime_error("mmap failed on " + path_ + " (" + std::strerror(errno) + ")");
         base_ = (const uint8_t*)p;
 #endif
         parse();

@@ -5,6 +5,9 @@
 // an I/O completion port; on Linux, O_DIRECT preads.  Both issue the reads from a small thread pool (submit only
 // queues), so many reads are in flight: STRATA_IO_THREADS sets its size (default 4 on Windows, 16 on Linux).
 //
+// Filesystems that refuse O_DIRECT (eCryptFS, some FUSE mounts): `open` retries with an ordinary descriptor and
+// POSIX_FADV_RANDOM, so the file is read through the file cache instead of failing. `is_direct()` tells which.
+//
 // Contract of every read: offset, length and buffer address are multiples of `alignment()` (4096 here).
 // Reads past end of file return the bytes that exist; `Completion::bytes` says how many.
 #pragma once
@@ -30,6 +33,10 @@ public:
     bool open(const std::string& path, std::string& err);
     void close();
     bool is_open() const;
+    /// True when the file is read unbuffered (O_DIRECT / NO_BUFFERING). False when `open` fell back to ordinary
+    /// reads through the file cache because the filesystem refuses O_DIRECT (eCryptFS, some FUSE mounts, tmpfs
+    /// before Linux 6.6) or STRATA_NO_ODIRECT=1 was set. The reads, their alignment and completions are the same.
+    bool is_direct() const;
     uint64_t size() const;
     static constexpr uint32_t alignment() { return 4096; }
 
