@@ -3064,6 +3064,8 @@ class Service:
         self.engine, self.tok, self.template, self.model, self.vision = engine, tokenizer, template, model_name, vision
         self.fit_max_tokens = fit_max_tokens          # --fit-max-tokens: clamp the output cap instead of 400
         self.drop_oldest = False                      # #17 (opt-in): a conversation too long loses its oldest turns
+        self.preserve_thinking = False                # #25 (opt-in): earlier turns keep their thinking in the prompt
+        self.reasoning_memory: collections.OrderedDict[str, str] = collections.OrderedDict()   # remember_reasoning()
         self.aliases: list[str] = []                  # #297: other names of the model (the config's `aliases`)
         self.reasoning_close_retry = False            # #1053 (opt-in): close the thinking once when a reply ends inside it
         self.codex_compaction_cache = False           # #924 (opt-in): a Codex compaction is rendered with its conversation's tools
@@ -3183,8 +3185,10 @@ class Service:
         # an image in a prompt (prepare()): the token the template writes for it, which stands for each of its rows;
         # the token the template writes before that one, if it writes one; the tokens to put around the rows, if
         # the template leaves that to the program
+        # A template that writes the marker alone (MiniCPM-V 4.7's, like Gemma 4's) has no token before it to tell
+        # an image's marker from the same text in a message: the first ones are the images (prepare()).
         self.image_marks = ("<|image|>", None, ("<|image>", "<image|>")) if self.call_format == "gemma" else \
-            (IMAGE_PAD, VISION_START, None)
+            (IMAGE_PAD, VISION_START if VISION_START in getattr(self.template, "source", VISION_START) else None, None)
 
     def loaded(self) -> bool:
         return not hasattr(self.engine, "alive") or self.engine.alive()
@@ -4011,8 +4015,10 @@ class Service:
             raise ValueError("No messages provided.")
         effort = kwargs.get("reasoning_effort")
         off = kwargs.get("enable_thinking") is False
-        # said either way: Gemma's template thinks only when told to, the others unless told not to
-        kwargs = {**self.template_tokens, **kwargs, "enable_thinking": not off}
+        # said either way: Gemma's template thinks only when told to, the others unless told not to.  The config's
+        # preserve_thinking is the default; a request's chat_template_kwargs can still turn it off.
+        kwargs = {**self.template_tokens, **({"preserve_thinking": True} if self.preserve_thinking else {}), **kwargs,
+                  "enable_thinking": not off}
         if self.call_format in ("gemma", "dsml") and tools:   # their templates read a tool as OpenAI sends it
             tools = [{"type": "function", "function": t} for t in tools]
         if not self.effort_end or (not off and effort in (None, "", "xhigh", "high")):
@@ -4120,6 +4126,8 @@ class Service:
         # `cancel` (#1999): set when the client hangs up; the downloads, the wait for the turn and the encodes stop
         # between pictures and raise ClientGone
         fetched = self._note_unreadable_tool_images(messages, cancel)
+        if self.preserve_thinking and kwargs.get("preserve_thinking") is not False:
+            messages = self.restore_reasoning(messages)
         ids = self.encode_prompt(messages, tools, kwargs)
         if self.drop_oldest:
             messages, ids = self.drop_oldest_turns(messages, tools, kwargs, ids, max_new)
@@ -4348,10 +4356,41 @@ class Service:
         if ka is not None:
             ka.acquire()
         try:
-            yield from self._run(ids, thinking, tools, max_new, sampling, cancel, force)
+            if not self.preserve_thinking:
+                yield from self._run(ids, thinking, tools, max_new, sampling, cancel, force)
+                return
+            reasoning, text = [], []
+            for kind, payload in self._run(ids, thinking, tools, max_new, sampling, cancel, force):
+                if kind == "event" and payload.kind in ("reasoning", "content"):
+                    (reasoning if payload.kind == "reasoning" else text).append(payload.text or "")
+                yield kind, payload
+            self.remember_reasoning("".join(text), "".join(reasoning))
         finally:
             if ka is not None:
                 ka.release()
+
+    def remember_reasoning(self, text: str, reasoning: str):
+        """#25: an answer's thinking, by its text, for a client that sends the answer back without it (the chat page,
+        Open WebUI and VS Code's Copilot do): restore_reasoning() puts it back.  The last 512 answers with text."""
+        key, reasoning = text.strip(), reasoning.strip()
+        if not key or not reasoning:
+            return
+        self.reasoning_memory[key] = reasoning
+        self.reasoning_memory.move_to_end(key)
+        while len(self.reasoning_memory) > 512:
+            self.reasoning_memory.popitem(last=False)
+
+    def restore_reasoning(self, messages):
+        """The earlier answers of `messages` with their thinking where the client left it out and this server wrote
+        them (remember_reasoning())."""
+        out = []
+        for m in messages:
+            text = m.get("content") if m.get("role") == "assistant" else None
+            if (isinstance(text, str) and not m.get("reasoning_content") and "</think>" not in text
+                    and text.strip() in self.reasoning_memory):
+                m = {**m, "reasoning_content": self.reasoning_memory[text.strip()]}
+            out.append(m)
+        return out
 
     def _run(self, ids, thinking, tools, max_new, sampling, cancel, force=None) -> Iterator[tuple[str, object]]:
         """Yields ("event", Event) as text arrives, then ("done", {"finish": .., "completion_tokens": ..}).
@@ -7122,6 +7161,7 @@ def main() -> int:
                   fit_max_tokens=a.fit_max_tokens or cfg.get("fit_max_tokens") is True)
     svc.reasoning_close_retry = cfg.get("reasoning_close_retry") is True    # #1053: opt-in, off by default
     svc.drop_oldest = cfg.get("drop_oldest") is True                        # #17: opt-in, off by default
+    svc.preserve_thinking = cfg.get("preserve_thinking") is True            # #25: opt-in, off by default
     if cfg.get("images"):                               # image generation (serve/images.py), set up by setup --images
         icfg = {k: (os.path.abspath(os.path.join(cfg.get("cwd") or ".", v))
                     if k in ("exe", "diffusion_model", "vae", "llm", "out_dir") and isinstance(v, str)

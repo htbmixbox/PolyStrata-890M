@@ -17,7 +17,7 @@ architectures, I'd like this work to go there, and I'm glad to help with that.
 
 Yes. It is built on Strata's own code: its quantized matvec kernels, its GGUF reader, its draft policy and suffix
 drafter, its conversation memory and the llama.cpp MMQ kernels Strata compiles. You can see the list in
-`CMakeLists.txt` (the `strata-poly` target). What is new is the model code for the four architectures and the
+`CMakeLists.txt` (the `strata-poly` target). What is new is the model code for the five architectures and the
 part that decides which experts sit in VRAM and which run on the CPU.
 
 ### How do I know the output is right?
@@ -150,6 +150,15 @@ room for the answer, as LM Studio's rolling window does. The system prompt and t
 window says how many messages it left out. Each request is cut again from the full conversation the app sends, so
 the model has forgotten what was dropped. Claude Code, Codex and OpenCode compact the conversation themselves and do
 not need it. A larger context (`--max-context` in the same file) keeps more of the chat.
+
+### Can the model see what it thought in earlier turns?
+
+With Qwen3.6, Ornith and Tiel Coder, if you ask for it. Their template leaves the thinking of earlier answers out of
+the prompt, so a model that thought of two numbers and said one makes the other up when asked for it later. Add
+`"preserve_thinking": true` to `strata-<model>.json` and restart, or send `"chat_template_kwargs":
+{"preserve_thinking": true}` with a request, as with llama.cpp. The server also remembers the thinking of the
+answers it wrote, so an app that sends an answer back without it (the chat page, Open WebUI) still gets it, as long as
+the answer's text comes back unchanged.
 
 ### Who maintains it?
 
