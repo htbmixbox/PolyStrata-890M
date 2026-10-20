@@ -18,6 +18,7 @@ a second machine, a Windows laptop whose card has 8 GB.
 | Ornith 1.5 35B-A3B | `qwen35moe` | `strata-poly` | APEX-MTP-I-Compact, I-Mini and I-Quality, 14.4 to 23.7 GB | draft block in the file |
 | Gemma 4 26B-A4B | `gemma4` | `strata-poly` | Unsloth UD-Q3_K_M, UD-Q2_K_XL and UD-Q4_K_M, 10.5 to 16.9 GB | its draft model, a file of 0.46 GB |
 | Tiel Coder 35B-A3B | `qwen35moe` | `strata-poly` | peculiar-ragdoll's UD-Q3_K_XL, UD-IQ3_XXS and UD-Q4_K_XL, 13.6 to 22.7 GB | draft block in the file |
+| Ornith 1.5 122B | `qwen35moe` | `strata-poly` | Unsloth UD-IQ1_M to Q8_0, nine sizes, 40.4 to 133 GB (not yet run: setup's estimates) | none: the file names carry no MTP block |
 | MiniCPM-V 4.7 35B-A3B | `qwen35moe` | `strata-poly` | OpenBMB Q4_K_M, mix_q3gud_im and Q6_K, 15.5 to 28.5 GB | none: it answers one token at a time |
 | DeepSeek V4 Flash | `deepseek4` | `strata-poly` | Unsloth UD-IQ2_XXS, three files, 90.9 GB | repeats only: its draft model is not run yet |
 | LFM2.5-24B-A2B | `lfm2moe` | `strata-poly` | Unsloth UD-Q4_K_XL, UD-Q3_K_XL, UD-Q6_K_XL and Q8_0, Liquid AI QAD-Q4_0, 10.9 to 25.5 GB | repeats only: there is no draft model |
@@ -69,6 +70,23 @@ straight to it. GLM 5.3 Flash and DeepSeek V4 Flash, the two large ones, have pa
 | `minicpmv` | MiniCPM-V 4.7 35B-A3B | Q4_K_M | 21.2 GB | about 25 GB |
 | | | mix_q3gud_im | 15.5 GB | about 19 GB |
 | | | Q6_K | 28.5 GB | about 31 GB |
+| `ornith122` | Ornith 1.5 122B | Unsloth UD-IQ1_M (1-bit) | 40.4 GB | about 44 GB |
+| | | Unsloth UD-IQ2_XXS (2-bit) | 42 GB | about 45 GB |
+| | | Unsloth UD-Q2_K_XL (2-bit) | 44.5 GB | about 48 GB |
+| | | Unsloth UD-IQ3_XXS (3-bit) | 49.5 GB | about 52 GB |
+| | | Unsloth UD-Q3_K_XL (3-bit, 3 files) | 59.8 GB | about 62 GB |
+| | | Unsloth UD-Q4_K_XL (4-bit, 3 files) | 79.7 GB | about 82 GB |
+| | | Unsloth UD-Q5_K_XL (5-bit, 3 files) | 94.6 GB | about 96 GB |
+| | | Unsloth UD-Q6_K_XL (6-bit, 4 files) | 114 GB | about 115 GB |
+| | | Unsloth Q8_0 (8-bit, 4 files) | 133 GB | about 133 GB |
+
+`ornith122` lists its sizes by size, and setup takes by itself the first of UD-Q4_K_XL, UD-Q3_K_XL, UD-IQ3_XXS,
+UD-Q2_K_XL, UD-IQ2_XXS and UD-IQ1_M that the PC's RAM holds (96 GB gets UD-Q4_K_XL); UD-Q5_K_XL, UD-Q6_K_XL and Q8_0
+are by name: `--family ornith122 --model UD-Q5_K_XL`. The four smallest sizes are one file, the others are split in
+three or four files that setup downloads into one folder and the engine opens from the first. The files' sizes and
+SHA-256 are read from the Hub's LFS pointer of each file at the pinned revision when they are installed, so the
+first run needs the Hub's answer (a file checked once keeps its mark). The RAM, VRAM and arena figures of this family
+are setup's estimates from the file sizes, not measurements; its image encoder is `mmproj-F16.gguf` (0.9 GB).
 
 A family's first size is the one setup takes. On a PC with less RAM than that wants it takes the second, the
 smallest, and the third is by name: `--model UD-Q4_K_M`, `--model APEX-I-QUALITY`, `--model UD-Q4_K_XL`. The

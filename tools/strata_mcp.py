@@ -173,6 +173,17 @@ FALLBACK_FAMILIES = {
                                              "download_gb": 15.5, "ram_gb": 19, "arena_gb": 13.8},
                             "Q6_K": {"about": "6-bit experts (K-quant)",
                                      "download_gb": 28.5, "ram_gb": 31, "arena_gb": 26.4}}},
+    "ornith122": {"title": "Ornith 1.5 122B", "about": "the 122B model on the strata-poly engine (architecture qwen35moe): nine sizes from 1 to 8 bits, 40 to 133 GB; ~44 GB of RAM at the smallest, ~82 GB at 4 bits",
+                  "tag": "ornith122-", "engine": "poly", "vision": True, "experimental": True,
+                  "models": {"UD-IQ1_M": {"about": "1-bit (Unsloth Dynamic): the least RAM", "download_gb": 40.4, "ram_gb": 44, "arena_gb": 33.9},
+                             "UD-IQ2_XXS": {"about": "2-bit i-quant experts (Unsloth Dynamic)", "download_gb": 42.0, "ram_gb": 45, "arena_gb": 35.4},
+                             "UD-Q2_K_XL": {"about": "2-bit K-quant experts (Unsloth Dynamic)", "download_gb": 44.5, "ram_gb": 48, "arena_gb": 37.7},
+                             "UD-IQ3_XXS": {"about": "3-bit i-quant experts (Unsloth Dynamic)", "download_gb": 49.5, "ram_gb": 52, "arena_gb": 42.5},
+                             "UD-Q3_K_XL": {"about": "3-bit K-quant experts (Unsloth Dynamic), three files", "download_gb": 59.8, "ram_gb": 62, "arena_gb": 52.5},
+                             "UD-Q4_K_XL": {"about": "4-bit experts (Unsloth Dynamic), three files", "download_gb": 79.7, "ram_gb": 82, "arena_gb": 71.9},
+                             "UD-Q5_K_XL": {"about": "5-bit experts (Unsloth Dynamic), three files", "download_gb": 94.6, "ram_gb": 96, "arena_gb": 86.2},
+                             "UD-Q6_K_XL": {"about": "6-bit experts (Unsloth Dynamic), four files", "download_gb": 114.0, "ram_gb": 115, "arena_gb": 105.0},
+                             "Q8_0": {"about": "8-bit throughout: the closest to the model as trained, four files", "download_gb": 133.0, "ram_gb": 133, "arena_gb": 123.2}}},
 }
 FALLBACK_CONTEXTS = [8192, 32768, 65536, 131072, 204800, 262144, 393216, 524288]
 BENCH_PROMPT = ("Write a short story (about 300 words) about a lighthouse keeper who finds a message in a bottle. "

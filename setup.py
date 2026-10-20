@@ -86,6 +86,7 @@ HF_REVISIONS = {
     "unsloth/LFM2.5-24B-A2B-GGUF": "faa77113e93335b63423e9e8d33395f86eaf8946",                        # 2026-10-15
     "LiquidAI/LFM2.5-24B-A2B-GGUF": "0912d33141f77e10705345a6732bfd83f0252fdc",                       # 2026-10-15
     "openbmb/MiniCPM-V-4.7-35B-A3B-gguf": "77f6d8cb08b2b115ce27d2e2ac1359e126921689",                   # 2026-10-12
+    "unsloth/Ornith-1.5-122B-GGUF": "3842d003341507c216295c6f28dfcd30349925c6",                         # 2026-10-20
 }
 
 
@@ -692,6 +693,66 @@ FAMILIES = {
                            (28513556672, "159ce7d2fe4aab95233096ad007c23d86d99dd6c4a20d3f7c31e990d09aa71b7"),
                            "mmproj-model-f16.gguf":
                            (1119575840, "bff3b688e14c300eca273092c37c50a0ddfcc2054e079af1a0480edeed5d20f1")}},
+    # Ornith 1.5 122B (GGUF architecture qwen35moe, like the 35B models above: the engine reads the layer count, the
+    # widths and the experts from the file), Unsloth's Dynamic quantizations from 1 to 8 bits.  The four smallest
+    # sizes are one file in the repository's root, the five larger ones are split in a folder of their own
+    # ("hf" and "file" and "shards" of the size).  Its sizes and shard names are from the repository's file list at
+    # the pinned revision; the byte counts and SHA-256 of the model files are read from the Hub's LFS pointer of each
+    # file at that revision when it is installed (pin_of(), "hub_pins"), the image encoder's are pinned here.
+    # ESTIMATES, not measured on a card: "arena_gb" (the routed experts: the file less the dense weights, 6.5 GB at
+    # 1 bit to 9.8 GB at Q8_0), "vram_beside_gb" (the dense weights and ~2.6 GB of caches and buffers) and "row_bytes"
+    # (Qwen3.6's 26,624 scaled by 12 full-attention layers to its 10).  "ram_gb" is poly_ram_need() for an 8 GB card
+    # from them.  No size says "draft": the file names carry no MTP, so its answers are one token at a time.
+    # "prefer": the sizes setup takes by itself, the first that this PC's RAM holds; the menu lists them by size.
+    "ornith122": {"title": "Ornith 1.5 122B", "by": "ornith-ai; quantized by Unsloth",
+                  "about": "the 122B model on the strata-poly engine (architecture qwen35moe): nine sizes from 1 to "
+                           "8 bits, 40 to 133 GB; ~44 GB of RAM at the smallest, ~82 GB at 4 bits",
+                  "hf": hf("unsloth/Ornith-1.5-122B-GGUF"), "file": "Ornith-1.5-122B-{q}.gguf", "shards": 1,
+                  "tag": "ornith122-", "name": "ornith-1.5-122b", "engine": "poly", "vision": True,
+                  "experimental": True, "hub_pins": True, "row_bytes": 32768,
+                  "prefer": ("UD-Q4_K_XL", "UD-Q3_K_XL", "UD-IQ3_XXS", "UD-Q2_K_XL", "UD-IQ2_XXS", "UD-IQ1_M",
+                             "UD-Q5_K_XL", "UD-Q6_K_XL", "Q8_0"),
+                  "mmproj_hf": hf("unsloth/Ornith-1.5-122B-GGUF"), "mmproj": "mmproj-F16.gguf",
+                  "vision_gb": 0.9, "vision_vram_gb": 1.6,
+                  "models": {"UD-IQ1_M": {"about": "1-bit (Unsloth Dynamic): the least RAM",
+                                          "download_gb": 40.4, "ram_gb": 44, "arena_gb": 33.9,
+                                          "vram_beside_gb": 9.1},
+                             "UD-IQ2_XXS": {"about": "2-bit i-quant experts (Unsloth Dynamic)",
+                                            "download_gb": 42.0, "ram_gb": 45, "arena_gb": 35.4,
+                                            "vram_beside_gb": 9.2},
+                             "UD-Q2_K_XL": {"about": "2-bit K-quant experts (Unsloth Dynamic)",
+                                            "download_gb": 44.5, "ram_gb": 48, "arena_gb": 37.7,
+                                            "vram_beside_gb": 9.4},
+                             "UD-IQ3_XXS": {"about": "3-bit i-quant experts (Unsloth Dynamic)",
+                                            "download_gb": 49.5, "ram_gb": 52, "arena_gb": 42.5,
+                                            "vram_beside_gb": 9.6},
+                             "UD-Q3_K_XL": {"about": "3-bit K-quant experts (Unsloth Dynamic), three files",
+                                            "download_gb": 59.8, "ram_gb": 62, "arena_gb": 52.5,
+                                            "vram_beside_gb": 9.9, "shards": 3,
+                                            "file": "Ornith-1.5-122B-{q}-0000{i}-of-00003.gguf",
+                                            "hf": hf("unsloth/Ornith-1.5-122B-GGUF") + "UD-Q3_K_XL/"},
+                             "UD-Q4_K_XL": {"about": "4-bit experts (Unsloth Dynamic), three files",
+                                            "download_gb": 79.7, "ram_gb": 82, "arena_gb": 71.9,
+                                            "vram_beside_gb": 10.4, "shards": 3,
+                                            "file": "Ornith-1.5-122B-{q}-0000{i}-of-00003.gguf",
+                                            "hf": hf("unsloth/Ornith-1.5-122B-GGUF") + "UD-Q4_K_XL/"},
+                             "UD-Q5_K_XL": {"about": "5-bit experts (Unsloth Dynamic), three files",
+                                            "download_gb": 94.6, "ram_gb": 96, "arena_gb": 86.2,
+                                            "vram_beside_gb": 11.0, "shards": 3,
+                                            "file": "Ornith-1.5-122B-{q}-0000{i}-of-00003.gguf",
+                                            "hf": hf("unsloth/Ornith-1.5-122B-GGUF") + "UD-Q5_K_XL/"},
+                             "UD-Q6_K_XL": {"about": "6-bit experts (Unsloth Dynamic), four files",
+                                            "download_gb": 114.0, "ram_gb": 115, "arena_gb": 105.0,
+                                            "vram_beside_gb": 11.6, "shards": 4,
+                                            "file": "Ornith-1.5-122B-{q}-0000{i}-of-00004.gguf",
+                                            "hf": hf("unsloth/Ornith-1.5-122B-GGUF") + "UD-Q6_K_XL/"},
+                             "Q8_0": {"about": "8-bit throughout: the closest to the model as trained, four files",
+                                      "download_gb": 133.0, "ram_gb": 133, "arena_gb": 123.2,
+                                      "vram_beside_gb": 12.4, "shards": 4,
+                                      "file": "Ornith-1.5-122B-{q}-0000{i}-of-00004.gguf",
+                                      "hf": hf("unsloth/Ornith-1.5-122B-GGUF") + "Q8_0/"}},
+                  "sha256": {"mmproj-F16.gguf":
+                             (908724544, "39db176176a904b101f5173a4f03e785990f9279f94ab373c4fd629ae7011817")}},
 }
 MMPROJ = "mmproj-Qwen3.8-Flash-Next-BF16.gguf"
 # Qwen3.6-35B-A3B (GGUF architecture qwen35moe), Unsloth's GGUFs with the MTP block: a family with an engine path of its
@@ -2144,6 +2205,39 @@ def verify_sha256(s: Path, size: int, sha: str) -> None:
         fail(f"{s.name} has the wrong SHA-256 ({h.hexdigest()}, expected {sha}): deleted",
              "run setup again to download it again")
     mark(s, f"sha256 {sha}")
+
+
+HUB_POINTER = re.compile(r"oid sha256:([0-9a-f]{64})\s+size (\d+)")
+
+
+def pin_of(fam: dict, d: dict, s: Path, base: str | None = None) -> tuple:
+    """(bytes, SHA-256) of one of a family's files, for verify_sha256: the value the family pins, or, for a family
+    that pins only its repository's revision ("hub_pins"), what the Hub's LFS pointer of the file says at that
+    revision (the same URL with /raw/ for /resolve/), read once.  Without a connection a file that an earlier run
+    verified is taken at its finish mark's SHA-256 (the mark is written only after a check against this pointer)."""
+    pins = fam.setdefault("sha256", {})
+    if s.name in pins:
+        return pins[s.name]
+    if not fam.get("hub_pins"):
+        raise KeyError(s.name)
+    url = (base or d.get("hf", fam["hf"])) + s.name
+    try:
+        req = urllib.request.Request(url.replace("/resolve/", "/raw/", 1), headers={"User-Agent": "strata-setup"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            m = HUB_POINTER.search(r.read(4096).decode("utf-8", "replace"))
+        if m is None:
+            raise ValueError("the answer is not an LFS pointer")
+        pins[s.name] = (int(m.group(2)), m.group(1))
+    except (OSError, ValueError) as e:
+        mk = s.with_name(s.name + ".done")
+        found = re.search(r"sha256 ([0-9a-f]{64})", mk.read_text(encoding="utf-8", errors="replace")) \
+            if s.exists() and mk.exists() else None
+        if found is None:
+            fail(f"cannot read the checksum of {s.name} from the Hub ({e})",
+                 f"check the connection (or HF_ENDPOINT) and run setup again: {url.replace('/resolve/', '/raw/', 1)}")
+        warn(f"the Hub does not answer ({e}): {s.name} is checked against the SHA-256 of its earlier check")
+        pins[s.name] = (s.stat().st_size, found.group(1))
+    return pins[s.name]
 
 
 def ready_files(model: str) -> list:
@@ -6189,7 +6283,7 @@ def poly_setup(a, family, gpu, hip, cuda_tk, multi, ram, data, elsewhere, port, 
     if hip and WIN:
         fail(f"{title} has no AMD engine for Windows: its HIP engine is compiled on Linux",
              "choose another model for this card, or run setup on Linux")
-    if hip and family in ("glm", "deepseek", "lfm25", "gemma4", "tiel"):   # the engine runs on AMD, these models not yet
+    if hip and family in ("glm", "deepseek", "lfm25", "gemma4", "tiel", "ornith122"):   # the engine runs on AMD, these models not yet
         warn(f"{title} on the AMD card has not been tried: the engine runs there, this model was not")
     if cuda_tk == 12:
         warn(f"{title}'s engine with CUDA 12 is compiled here (the ready-made one is CUDA 13)" +
@@ -6221,7 +6315,8 @@ def poly_setup(a, family, gpu, hip, cuda_tk, multi, ram, data, elsewhere, port, 
     vram = gpu["vram_gb"]
     if multi:   # each card has its layers' dense weights; its own scratch and staging buffer cost ~2 GB a card more
         vram = sum(gpu_info(i)["vram_gb"] for i in multi) - 2.0 * (len(multi) - 1)
-    model = a.model or poly_default(sizes, ram, vram)
+    first = {m: sizes[m] for m in fam["prefer"]} if fam.get("prefer") else sizes   # the order setup tries them in
+    model = a.model or poly_default(first, ram, vram)
     if not a.model and len(names) > 1:
         say()
         say("  Which size?  The RAM is setup's estimate for this card: the experts it does not hold stay in RAM.")
@@ -6379,16 +6474,16 @@ def poly_setup(a, family, gpu, hip, cuda_tk, multi, ram, data, elsewhere, port, 
             download(d.get("hf", fam["hf"]) + s.name, s)
     check_shards(shards)
     for s in shards:
-        verify_sha256(s, *fam["sha256"][s.name])
+        verify_sha256(s, *pin_of(fam, d, s))
     if guesser is not None:
         if not have_guesser:
             say("  Its draft model lets it guess a few words ahead and check them at once (faster answers).")
             download(d.get("hf", fam["hf"]) + d["draft_model"], guesser)
-        verify_sha256(guesser, *fam["sha256"][guesser.name])
+        verify_sha256(guesser, *pin_of(fam, d, guesser))
     if mmproj is not None:
         if not have_mmproj:
             download(fam["mmproj_hf"] + fam["mmproj"], mmproj, "vision encoder")
-        verify_sha256(mmproj, *fam["sha256"][mmproj.name])
+        verify_sha256(mmproj, *pin_of(fam, d, mmproj, fam["mmproj_hf"]))
         ok(f"vision encoder: {mmproj}")
     ok("model file present")
 
@@ -6767,7 +6862,8 @@ def main() -> int:
     ap.add_argument("--family", choices=list(FAMILIES) + list(PREVIEW_FAMILIES),
                     help="qwen = Qwen3.8-Flash-Next, swift = Swift 1.5, glm = GLM 5.3 Flash (docs/GLM.md), deepseek = "
                          "DeepSeek V4 Flash, lfm25 = LFM2.5-24B-A2B, qwen36 = Qwen3.6-35B-A3B on strata-poly, ornith = "
-                         "Ornith 1.5, gemma4 = Gemma 4 26B-A4B, tiel = Tiel Coder 35B-A3B, minicpmv = MiniCPM-V 4.7 "
+                         "Ornith 1.5 35B-A3B, ornith122 = Ornith 1.5 122B (1 to 8 bits, 40-133 GB), gemma4 = Gemma 4 "
+                         "26B-A4B, tiel = Tiel Coder 35B-A3B, minicpmv = MiniCPM-V 4.7 "
                          "35B-A3B (docs/BACKENDS.md), qwen36-strata = Qwen3.6-35B-A3B on the Strata project's "
                          "own engine (UD-Q4_K_XL and up, 32 GB of RAM or more)")
     ap.add_argument("--model", choices=list(dict.fromkeys(

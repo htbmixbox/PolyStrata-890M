@@ -1849,6 +1849,9 @@ if(STRATA_NATIVE_EXPERTS AND (STRATA_ENABLE_CUDA OR STRATA_ENABLE_HIP) AND NOT S
                                            ${_strata_gpu_blas_target} ${_strata_gpu_runtime_target}
                                            ${_strata_poly_driver}
                                            Threads::Threads)
+  if(STRATA_ENABLE_HIP)
+    target_link_libraries(strata-poly PRIVATE roc::hipblas)
+  endif()
   # needs the model file, so it is run by hand: poly_expert_parity MODEL.gguf
   add_executable(poly_expert_parity src/poly/expert_parity.cpp src/poly/cpu_experts.cpp src/poly/kernels.cu)
   target_include_directories(poly_expert_parity PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
